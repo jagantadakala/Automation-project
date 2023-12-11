@@ -1,29 +1,53 @@
 #!/bin/bash
 
-# Step 1: Update package details and package list
+# Function to check and create inventory.html if not present
+check_and_create_inventory() {
+    inventory_file="/var/www/html/inventory.html"
+
+    if [ ! -f "$inventory_file" ]; then
+        # Create inventory.html with header
+        echo -e "Log Type\tDate Created\tType\tSize" > "$inventory_file"
+    fi
+}
+
+# Function to append entry to inventory.html
+append_to_inventory() {
+    log_type=$1
+    timestamp=$2
+    archive_type=$3
+    size=$4
+
+    echo -e "${log_type}\t${timestamp}\t${archive_type}\t${size}" >> "/var/www/html/inventory.html"
+}
+
+# Step 1: Bookkeeping
+check_and_create_inventory
+
+# Step 2: Update package details and package list
 sudo apt update -y
 
-# Step 2: Install apache2 if not already installed
-if ! dpkg -l | grep -q apache2; then
-    sudo apt install apache2 -y
-fi
+# ... (rest of your script)
 
-# Step 3: Ensure apache2 service is running
-sudo service apache2 status || sudo service apache2 start
-
-# Step 4: Ensure apache2 service is enabled
-sudo systemctl enable apache2
-
-# Step 5: Create a tar archive of apache2 logs
+# Step 6: Create a tar archive of apache2 logs
 timestamp=$(date '+%d%m%Y-%H%M%S')
-myname="jagan"
+myname="jagan"  # Replace with your name
 log_directory="/var/log/apache2/"
 tmp_directory="/tmp/"
 
 # Create a tar archive of .log files in /var/log/apache2/
 tar -cvf "${tmp_directory}${myname}-httpd-logs-${timestamp}.tar" -C "$log_directory" --exclude='*.zip' --exclude='*.tar' *.log
 
-# Step 6: Run AWS CLI command to copy the archive to S3 bucket
-s3_bucket="jagan24"  # Replace with your S3 bucket name
-aws s3 cp "${tmp_directory}${myname}-httpd-logs-${timestamp}.tar" "s3://${s3_bucket}/${myname}-httpd-logs-${timestamp}.tar"
+# Step 7: Update inventory.html with archive information
+append_to_inventory "httpd-logs" "$timestamp" "tar" "10K"
+
+# Step 8: Cron Job
+cron_file="/etc/cron.d/automation"
+script_path="/root/YourRepositoryName/automation.sh"
+
+# Check if cron job is scheduled
+if [ ! -f "$cron_file" ]; then
+    # Create cron job file
+    echo "0 0 * * * root $script_path" > "$cron_file"
+fi
+
 
